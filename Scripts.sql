@@ -40,8 +40,10 @@ CREATE TABLE temporal (
 CREATE TABLE information (
   `Year` int DEFAULT NULL,
   `Month` int DEFAULT NULL,
+  `NameMonth` varchar(10) DEFAULT NULL,
   `DayofMonth` int DEFAULT NULL,
   `DayOfWeek` int DEFAULT NULL,
+  `NameDayOfWeek` varchar(10) DEFAULT NULL,
   `DepTime` int DEFAULT NULL,
   `DepTimeHour` int DEFAULT NULL,
   `DepTimeMinutes` int DEFAULT NULL,
@@ -82,8 +84,31 @@ SELECT COUNT(*) FROM temporal;
 INSERT INTO information
 SELECT t.`Year`,
 	t.`Month`,
+	CASE 
+		WHEN t.Month = 1  THEN 'Enero'
+		WHEN t.Month = 2  THEN 'Febrero'
+		WHEN t.Month = 3  THEN 'Marzo'
+		WHEN t.Month = 4  THEN 'Abril'
+		WHEN t.Month = 5  THEN 'Mayo'
+		WHEN t.Month = 6  THEN 'Junio'
+		WHEN t.Month = 7  THEN 'Julio'
+		WHEN t.Month = 8  THEN 'Agosto'
+		WHEN t.Month = 9  THEN 'Septiembre'
+		WHEN t.Month = 10  THEN 'Octubre'
+		WHEN t.Month = 11  THEN 'Noviembre'
+		ELSE 'Diciembre'
+	END NameMonth,
 	t.`DayofMonth`,
 	t.`DayOfWeek`,
+	CASE 
+		WHEN t.DayOfWeek = 1  THEN 'Lunes'
+		WHEN t.DayOfWeek = 2  THEN 'Martes'
+		WHEN t.DayOfWeek = 3  THEN 'Miércoles'
+		WHEN t.DayOfWeek = 4  THEN 'Jueves'
+		WHEN t.DayOfWeek = 5  THEN 'Viernes'
+		WHEN t.DayOfWeek = 6  THEN 'Sábado'
+		ELSE 'Domingo'
+	END NameDayOfWeek,
 	CASE 
 		WHEN t.DepTime = 'NA'  THEN NULL
 		ELSE t.DepTime
@@ -240,7 +265,8 @@ GROUP BY f.DepTimeHour
 ORDER BY count(*) DESC;
 
 #Mejoras horas en general
-#Se ve la cantidad de vuelos en general a esa hora, la cantidad de vuelos que salen y llegan a tiempo, el porcentaje de vuelos a tiempo
+
+#Mejor hora para viajar
 SELECT on_time.TimeHour TimeHour
 	, on_time.FlightsOnTime FlightsOnTime
 	, total.FlightTotal FlightTotal
@@ -256,6 +282,42 @@ join (SELECT f.DepTimeHour TimeHour, count(*) FlightTotal
 FROM flights.information f
 WHERE f.Cancelled = 0
 GROUP BY f.DepTimeHour) total on on_time.TimeHour = total.TimeHour
+ORDER BY on_time.FlightsOnTime/total.FlightTotal DESC
+
+#Mejor mes para viajar
+SELECT on_time.Month Month
+	, on_time.FlightsOnTime FlightsOnTime
+	, total.FlightTotal FlightTotal
+	, (on_time.FlightsOnTime/total.FlightTotal)*100 PercentageOnTime
+FROM
+(SELECT f.NameMonth Month, count(*) FlightsOnTime
+FROM flights.information f
+WHERE f.Cancelled = 0
+	and f.ArrDelay = 0
+	and f.DepDelay = 0
+GROUP BY f.NameMonth) on_time 
+join (SELECT f.NameMonth Month, count(*) FlightTotal
+FROM flights.information f
+WHERE f.Cancelled = 0
+GROUP BY f.NameMonth) total on on_time.Month = total.Month
+ORDER BY on_time.FlightsOnTime/total.FlightTotal DESC
+
+#Mejor día de la semana para viajar
+SELECT on_time.NameDayOfWeek NameDayOfWeek
+	, on_time.FlightsOnTime FlightsOnTime
+	, total.FlightTotal FlightTotal
+	, (on_time.FlightsOnTime/total.FlightTotal)*100 PercentageOnTime
+FROM
+(SELECT f.NameDayOfWeek NameDayOfWeek, count(*) FlightsOnTime
+FROM flights.information f
+WHERE f.Cancelled = 0
+	and f.ArrDelay = 0
+	and f.DepDelay = 0
+GROUP BY f.NameDayOfWeek) on_time 
+join (SELECT f.NameDayOfWeek NameDayOfWeek, count(*) FlightTotal
+FROM flights.information f
+WHERE f.Cancelled = 0
+GROUP BY f.NameDayOfWeek) total on on_time.NameDayOfWeek = total.NameDayOfWeek
 ORDER BY on_time.FlightsOnTime/total.FlightTotal DESC
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -289,7 +351,8 @@ ORDER BY total_2002.Total DESC
 
 #------------------------------------------------------------------------------------------------------------------------
 #¿Puede alguna falla o demora en una aeropuerto causar fallas en los demás? ¿Cuáles son los aeropuertos más críticos en ese sentido?
-
-
-
-
+SELECT f.Origin Origin, SUM(f.DepDelay) DepartureDelay, SUM(f.ArrDelay) ArriveDelay
+FROM flights.information f
+WHERE f.Cancelled = 0
+GROUP BY f.Origin
+ORDER BY SUM(f.DepDelay) DESC, SUM(f.ArrDelay) DESC
